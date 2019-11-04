@@ -53,20 +53,6 @@ SwapHeader (NoffHeader *noffH)
 
 AddrSpace::AddrSpace()
 {
-    pageTable = new TranslationEntry[NumPhysPages];
-    for (unsigned int i = 0; i < NumPhysPages; i++) {
-	pageTable[i].virtualPage = i;	// for now, virt page # = phys page #
-	pageTable[i].physicalPage = i;
-//	pageTable[i].physicalPage = 0;
-	pageTable[i].valid = TRUE;
-//	pageTable[i].valid = FALSE;
-	pageTable[i].use = FALSE;
-	pageTable[i].dirty = FALSE;
-	pageTable[i].readOnly = FALSE;  
-    }
-    
-    // zero out the entire address space
-//    bzero(kernel->machine->mainMemory, MemorySize);
 }
 
 //----------------------------------------------------------------------
@@ -76,7 +62,18 @@ AddrSpace::AddrSpace()
 
 AddrSpace::~AddrSpace()
 {
-   delete pageTable;
+    DEBUG(dbgAddr, "Unset page table.");
+    DEBUG(dbgPage, "Deallocate " << numPages << " pages");
+    
+    for (unsigned int i = 0; i < numPages; ++i)
+    {
+        int j = pageTable[i].physicalPage;
+        kernel->machine->PhysPageStatus[j] = FREE;
+        ++kernel->machine->FreePhysPages;
+    }
+
+    DEBUG(dbgPage, "Free page: " << kernel->machine->FreePhysPages);
+    delete pageTable;
 }
 
 
@@ -122,19 +119,40 @@ AddrSpace::Load(char *fileName)
 
     DEBUG(dbgAddr, "Initializing address space: " << numPages << ", " << size);
 
+    // Setting page table
+    DEBUG(dbgPage, "Free page: " << kernel->machine->FreePhysPages);
+    ASSERT(numPages <= kernel->machine->FreePhysPages); // There are enough pages to allocate
+    DEBUG(dbgAddr, "Setting page table.");
+    DEBUG(dbgPage, "Allocate " << numPages << " pages");
+    pageTable = new TranslationEntry[numPages];
+    for (unsigned int i = 0, j = 0; i < numPages; i++)
+    {
+        pageTable[i].virtualPage = i;
+        while(kernel->machine->PhysPageStatus[j] != FREE) ++j;
+        pageTable[i].physicalPage = j;
+        pageTable[i].valid = TRUE;
+        pageTable[i].use = FALSE;
+        pageTable[i].dirty = FALSE;
+        pageTable[i].readOnly = FALSE;
+        
+        --kernel->machine->FreePhysPages;
+        kernel->machine->PhysPageStatus[j] = OCCUPY;
+        bzero(&kernel->machine->mainMemory[j * PageSize], PageSize);
+    }
+
 // then, copy in the code and data segments into memory
 	if (noffH.code.size > 0) {
         DEBUG(dbgAddr, "Initializing code segment.");
-	DEBUG(dbgAddr, noffH.code.virtualAddr << ", " << noffH.code.size);
-        	executable->ReadAt(
-		&(kernel->machine->mainMemory[noffH.code.virtualAddr]), 
+        DEBUG(dbgAddr, noffH.code.virtualAddr << ", " << noffH.code.size);
+        executable->ReadAt(
+		&(kernel->machine->mainMemory[pageTable[noffH.code.virtualAddr/PageSize].physicalPage * PageSize + (noffH.code.virtualAddr % PageSize)]), 
 			noffH.code.size, noffH.code.inFileAddr);
     }
 	if (noffH.initData.size > 0) {
         DEBUG(dbgAddr, "Initializing data segment.");
-	DEBUG(dbgAddr, noffH.initData.virtualAddr << ", " << noffH.initData.size);
+        DEBUG(dbgAddr, noffH.initData.virtualAddr << ", " << noffH.initData.size);
         executable->ReadAt(
-		&(kernel->machine->mainMemory[noffH.initData.virtualAddr]),
+		&(kernel->machine->mainMemory[pageTable[noffH.initData.virtualAddr/PageSize].physicalPage * PageSize + (noffH.initData.virtualAddr % PageSize)]), 
 			noffH.initData.size, noffH.initData.inFileAddr);
     }
 

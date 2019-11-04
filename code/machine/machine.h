@@ -30,7 +30,14 @@
 const unsigned int PageSize = 128; 		// set the page size equal to
 					// the disk sector size, for simplicity
 
-const unsigned int NumPhysPages = 32;
+#define TotalPhysPages 64
+const unsigned int NumPhysPages = TotalPhysPages;
+
+enum PageStatus {
+    FREE,
+    OCCUPY
+};
+
 const int MemorySize = (NumPhysPages * PageSize);
 const int TLBSize = 4;			// if there is a TLB, make it small
 
@@ -107,6 +114,8 @@ class Machine {
 
     char *mainMemory;		// physical memory to store user program,
 				// code and data, while executing
+    unsigned char PhysPageStatus[TotalPhysPages];
+    unsigned int FreePhysPages = TotalPhysPages;
 
 // NOTE: the hardware translation of virtual addresses in the user program
 // to physical addresses (relative to the beginning of "mainMemory")

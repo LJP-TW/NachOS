@@ -28,7 +28,8 @@ const char dbgDisk = 'd'; 		// disk emulation (FILESYS)
 const char dbgFile = 'f'; 		// file system (FILESYS)
 const char dbgAddr = 'a'; 		// address spaces (USER_PROGRAM)
 const char dbgNet = 'n'; 		// network emulation (NETWORK)
-const char dbgSleep = 'S'; 		
+const char dbgSleep = 'S'; 		// syscall sleep
+const char dbgPage = 'P'; 		// page allocation
 
 class Debug {
   public:

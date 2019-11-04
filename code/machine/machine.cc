@@ -56,6 +56,9 @@ Machine::Machine(bool debug)
 {
     int i;
 
+    for (i = 0; i < TotalPhysPages; i++)
+        PhysPageStatus[i] = FREE;
+
     for (i = 0; i < NumTotalRegs; i++)
         registers[i] = 0;
     mainMemory = new char[MemorySize];
