@@ -44,7 +44,13 @@ BlockedCompare (blockedThread *x, blockedThread *y)
 int PriorityCompare(Thread *a, Thread *b) {
     if(a->getPriority() == b->getPriority())
         return 0;
-    return a->getPriority() > b->getPriority() ? 1 : -1;
+    return a->getPriority() > b->getPriority() ? -1 : 1;
+}
+
+int BurstTimeCompare(Thread *a, Thread *b) {
+    if(a->getBurstTime() == b->getBurstTime())
+        return 0;
+    return a->getBurstTime() > b->getBurstTime() ? 1 : -1;
 }
 
 //----------------------------------------------------------------------
@@ -61,22 +67,23 @@ Scheduler::Scheduler()
 Scheduler::Scheduler(SchedulerType type)
 {
     blockedList = new SortedList<blockedThread *>(BlockedCompare);
-	schedulerType = type;
+    schedulerType = type;
 	switch(schedulerType) {
     	case RR:
-        	readyList = new List<Thread *>;
-        	break;
-    	case SJF:
-		/* todo */
-        	break;
-    	case Priority:
-		readyList = new SortedList<Thread *>(PriorityCompare);
-        	break;
     	case FIFO:
-		/* todo */
-		break;
+            readyList = new List<Thread *>;
+            break;
+    	case SJF:
+    	case SRTF:
+            readyList = new SortedList<Thread *>(BurstTimeCompare);
+            break;
+    	case NPP:
+    	case PP:
+            readyList = new SortedList<Thread *>(PriorityCompare);
+            break;
+        break;
    	}
-	toBeDestroyed = NULL;
+    toBeDestroyed = NULL;
 } 
 
 //----------------------------------------------------------------------
@@ -108,6 +115,24 @@ Scheduler::ReadyToRun (Thread *thread)
     readyList->Append(thread);
 }
 
+void
+Scheduler::ForceEnterReady (Thread *thread)
+{
+    ASSERT(kernel->interrupt->getLevel() == IntOff);
+    DEBUG(dbgThread, "Force Enter thread to ready list: " << thread->getName());
+
+    readyList->Append(thread);
+}
+
+void
+Scheduler::ForceLeaveReady (Thread *thread)
+{
+    ASSERT(kernel->interrupt->getLevel() == IntOff);
+    DEBUG(dbgThread, "Force Remove thread from ready list: " << thread->getName());
+
+    readyList->Remove(thread);
+}
+
 //----------------------------------------------------------------------
 // Scheduler::Sleep
 //  produce a blockedThread obj that contains when this thread wake up
@@ -122,8 +147,6 @@ void Scheduler::Sleep(Thread *thread, int fromNow)
    
     blockedThread *bt = new blockedThread(thread, fromNow);
     blockedList->Insert(bt);
-    DEBUG(dbgSleep, "Scheduler::Sleep isBlockedEmpty: " << kernel->scheduler->isBlockedEmpty());
-    DEBUG(dbgSleep, "Scheduler::Sleep isBlockedEmpty: " << blockedList->IsEmpty());
 
     thread->Sleep(false);
 }
@@ -152,6 +175,7 @@ Scheduler::Wakeup ()
             result = true;
             it->Next();
 
+            DEBUG(dbgThread, "Wakeup thread: " << item->thread->getName());
             scheduler->ReadyToRun(item->thread); 
             blockedList->Remove(item);
             delete item;
@@ -181,11 +205,13 @@ Scheduler::FindNextToRun ()
 {
     ASSERT(kernel->interrupt->getLevel() == IntOff);
 
-    if (readyList->IsEmpty()) {
-	return NULL;
-    } else {
-    	return readyList->RemoveFront();
+    if (readyList->IsEmpty())
+    {
+        if (kernel->currentThread == kernel->idleThread && blockedList->IsEmpty())
+            return NULL; // Halt
+        return kernel->idleThread; // Busy wait for blocked thread to wake up
     }
+    return readyList->RemoveFront();
 }
 
 //----------------------------------------------------------------------
@@ -232,7 +258,7 @@ Scheduler::Run (Thread *nextThread, bool finishing)
     kernel->currentThread = nextThread;  // switch to the next thread
     nextThread->setStatus(RUNNING);      // nextThread is now running
     
-    DEBUG(dbgThread, "Switching from: " << oldThread->getName() << " to: " << nextThread->getName());
+    DEBUG(dbgThread, "Ticks: " << kernel->stats->totalTicks << "\t| Switching from: " << oldThread->getName() << " to: " << nextThread->getName());
     
     // This is a machine-dependent assembly language routine defined 
     // in switch.s.  You may have to think
@@ -287,4 +313,5 @@ Scheduler::Print()
 {
     cout << "Ready list contents:\n";
     readyList->Apply(ThreadPrint);
+    cout << endl;
 }

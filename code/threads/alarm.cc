@@ -69,14 +69,14 @@ void Alarm::WaitUntil(int fromNow)
 void 
 Alarm::CallBack() 
 {
-    DEBUG(dbgSleep, "Alarm::Callback");
     Interrupt *interrupt = kernel->interrupt;
     Scheduler *scheduler = kernel->scheduler;
     MachineStatus status = interrupt->getStatus();
+
+    DEBUG(dbgSleep, "Alarm::Callback: " << kernel->stats->totalTicks);
     
     // If there is any thread wakes up
     bool woken = scheduler->Wakeup();
-    kernel->currentThread->setPriority(kernel->currentThread->getPriority() - 1);
 
     DEBUG(dbgSleep, "Alarm::Callback isBlockedEmpty: " << scheduler->isBlockedEmpty());
     if (status == IdleMode && !woken && scheduler->isBlockedEmpty()) {	// is it time to quit?
@@ -85,7 +85,8 @@ Alarm::CallBack()
 	}
     } else {			// there's someone to preempt
 	if(kernel->scheduler->getSchedulerType() == RR ||
-            kernel->scheduler->getSchedulerType() == Priority ) {
+            kernel->scheduler->getSchedulerType() == PP ||
+            kernel->scheduler->getSchedulerType() == SRTF) {
 		interrupt->YieldOnReturn();
 	}
     }

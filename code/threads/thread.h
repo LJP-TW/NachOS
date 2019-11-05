@@ -103,6 +103,8 @@ class Thread {
     
     void CheckOverflow();   	// Check if thread stack has overflowed
     void setStatus(ThreadStatus st) { status = st; }
+    void setArrivalTime(int t)	{arrivalTime = t;}
+    int getArrivalTime()		{return arrivalTime;}
     void setBurstTime(int t)	{burstTime = t;}
     int getBurstTime()		{return burstTime;}
     void setPriority(int t)	{priority = t;}
@@ -119,6 +121,7 @@ class Thread {
 				// (If NULL, don't deallocate stack)
     ThreadStatus status;	// ready, running or blocked
     char* name;
+    int arrivalTime;
     int burstTime;
     int priority;	
     void StackAllocate(VoidFunctionPtr func, void *arg);

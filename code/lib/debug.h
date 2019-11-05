@@ -30,6 +30,7 @@ const char dbgAddr = 'a'; 		// address spaces (USER_PROGRAM)
 const char dbgNet = 'n'; 		// network emulation (NETWORK)
 const char dbgSleep = 'S'; 		// syscall sleep
 const char dbgPage = 'P'; 		// page allocation
+const char dbgReady = 'R'; 		// ready list
 
 class Debug {
   public:

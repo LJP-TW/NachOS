@@ -26,6 +26,7 @@ ThreadedKernel::ThreadedKernel(int argc, char **argv)
 {
     randomSlice = FALSE; 
     type = RR;
+    testingScheduling = FALSE;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-rs") == 0) {
@@ -35,15 +36,29 @@ ThreadedKernel::ThreadedKernel(int argc, char **argv)
 	    randomSlice = TRUE;
 	    i++;
         } else if (strcmp(argv[i], "-u") == 0) {
-            cout << "Partial usage: nachos [-rs randomSeed]\n";
-	    } else if(strcmp(argv[i], "RR") == 0) {
+            cout << "Partial usage: nachos [-rs] [randomSeed]\n";
+            cout << "Partial usage: nachos [-RR]\n";
+            cout << "Partial usage: nachos [-FCFS]\n";
+            cout << "Partial usage: nachos [-SJF]\n";
+            cout << "Partial usage: nachos [-SRTF]\n";
+            cout << "Partial usage: nachos [-NPP]\n";
+            cout << "Partial usage: nachos [-PP]\n";
+	    } else if (strcmp(argv[i], "-T") == 0) {
+		    testingScheduling = TRUE;
+	    } else if(strcmp(argv[i], "-RR") == 0) {
             type = RR;
-        } else if (strcmp(argv[i], "FCFS") == 0) {
+        } else if (strcmp(argv[i], "-FCFS") == 0) {
             type = FIFO;
-        } else if (strcmp(argv[i], "PRIORITY") == 0) {
-            type = Priority;
-        } else if (strcmp(argv[i], "SJF") == 0) {
+        } else if (strcmp(argv[i], "-SJF") == 0) {
+		    testingScheduling = TRUE;
             type = SJF;
+        } else if (strcmp(argv[i], "-SRTF") == 0) {
+		    testingScheduling = TRUE;
+            type = SRTF;
+        } else if (strcmp(argv[i], "-NPP") == 0) {
+            type = NPP;
+        } else if (strcmp(argv[i], "-PP") == 0) {
+            type = PP;
         }
     }
 }
@@ -66,7 +81,7 @@ ThreadedKernel::Initialize()
     // We didn't explicitly allocate the current thread we are running in.
     // But if it ever tries to give up the CPU, we better have a Thread
     // object to save its state. 
-    currentThread = new Thread("main");		
+    idleThread = currentThread = new Thread("main");		
     currentThread->setStatus(RUNNING);
 
     interrupt->Enable();
@@ -102,7 +117,8 @@ ThreadedKernel::Run()
     // other threads on the ready list (started in SelfTest).  
     // We switch to those threads by saying that the "main" thread 
     // is finished, preventing it from returning.
-    currentThread->Finish();	
+    // currentThread->Finish();	
+    currentThread->Yield();	
     // not reached
 }
 
@@ -110,26 +126,6 @@ ThreadedKernel::Run()
 // ThreadedKernel::SelfTest
 //      Test whether this module is working.
 //----------------------------------------------------------------------
-
 void
 ThreadedKernel::SelfTest() {
-   Semaphore *semaphore;
-   SynchList<int> *synchList;
-   
-   LibSelfTest();		// test library routines
-   
-   currentThread->SelfTest();	// test thread switching
-   
-   				// test semaphore operation
-   semaphore = new Semaphore("test", 0);
-   semaphore->SelfTest();
-   delete semaphore;
-   
-   				// test locks, condition variables
-				// using synchronized lists
-   synchList = new SynchList<int>;
-   synchList->SelfTest(9);
-   delete synchList;
-
-   ElevatorSelfTest();
 }

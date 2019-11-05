@@ -103,7 +103,7 @@ Thread::Fork(VoidFunctionPtr func, void *arg)
 
     oldLevel = interrupt->SetLevel(IntOff);
     scheduler->ReadyToRun(this);	// ReadyToRun assumes that interrupts 
-					// are disabled!
+	    			// are disabled!
     (void) interrupt->SetLevel(oldLevel);
 }    
 
@@ -203,19 +203,49 @@ Thread::Finish ()
 void
 Thread::Yield ()
 {
+    Scheduler *scheduler = kernel->scheduler;
     Thread *nextThread;
+YieldAgain:
     IntStatus oldLevel = kernel->interrupt->SetLevel(IntOff);
     
     ASSERT(this == kernel->currentThread);
     
     DEBUG(dbgThread, "Yielding thread: " << name);
     
-    nextThread = kernel->scheduler->FindNextToRun();
-    if (nextThread != NULL) {
-	kernel->scheduler->ReadyToRun(this);
-	kernel->scheduler->Run(nextThread, FALSE);
+    if (debug->IsEnabled(dbgReady))
+        scheduler->Print();
+
+    // Make it auto sort again
+    if (this != kernel->idleThread)
+        scheduler->ForceEnterReady(this);
+
+    nextThread = scheduler->FindNextToRun();
+    if (nextThread != NULL && kernel->currentThread != nextThread) 
+    {
+        // when in idleThread, nextThread might be idleThread again.
+        if (this != kernel->idleThread)
+            status = READY;
+    	scheduler->Run(nextThread, FALSE);
     }
     (void) kernel->interrupt->SetLevel(oldLevel);
+
+    if (this == kernel->idleThread)
+    {
+        if(nextThread == NULL)
+        {
+            this->Finish(); // Halt
+        }
+        else
+        {
+            // Busy waiting
+            kernel->interrupt->OneTick();
+            goto YieldAgain;
+        }    
+    }
+    else
+    {
+        // User Thread, no content switch.
+    }
 }
 
 //----------------------------------------------------------------------
@@ -249,8 +279,15 @@ Thread::Sleep (bool finishing)
     DEBUG(dbgThread, "Sleeping thread: " << name);
 
     status = BLOCKED;
+
+    if (debug->IsEnabled(dbgThread)) {
+        kernel->scheduler->Print();
+    }
+
     while ((nextThread = kernel->scheduler->FindNextToRun()) == NULL)
-	kernel->interrupt->Idle();	// no one to run, wait for an interrupt
+    {
+	    kernel->interrupt->Idle();	// no one to run, wait for an interrupt
+    }
     
     // returns when it's time for us to run
     kernel->scheduler->Run(nextThread, finishing); 

@@ -22,27 +22,42 @@ UserProgKernel::UserProgKernel(int argc, char **argv)
 {
     debugUserProg = FALSE;
 	execfileNum=0;
+	priorityNum=0;
+
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-s") == 0) {
+        ASSERT(testingScheduling != TRUE);
 	    debugUserProg = TRUE;
 	}
 	else if (strcmp(argv[i], "-e") == 0) {
+        ASSERT(testingScheduling != TRUE);
 		execfile[++execfileNum]= argv[++i];
+	}
+	else if (strcmp(argv[i], "-p") == 0) {
+        ASSERT(testingScheduling != TRUE);
+		priority[++priorityNum]= argv[++i];
 	}
     	 else if (strcmp(argv[i], "-u") == 0) {
 		cout << "===========The following argument is defined in userkernel.cc" << endl;
 		cout << "Partial usage: nachos [-s]\n";
 		cout << "Partial usage: nachos [-u]" << endl;
-		cout << "Partial usage: nachos [-e] filename" << endl;
+		cout << "Partial usage: nachos [-e] [filename]" << endl;
+		cout << "Partial usage: nachos [-p] [priority]" << endl;
 	}
 	else if (strcmp(argv[i], "-h") == 0) {
 		cout << "argument 's' is for debugging. Machine status  will be printed " << endl;
 		cout << "argument 'e' is for execting file." << endl;
+		cout << "argument 'p' is for setting priority of execting file." << endl;
 		cout << "atgument 'u' will print all argument usage." << endl;
 		cout << "For example:" << endl;
 		cout << "	./nachos -s : Print machine status during the machine is on." << endl;
 		cout << "	./nachos -e file1 -e file2 : executing file1 and file2."  << endl;
 	}
+    }
+
+    if (priorityNum != 0)
+    {
+        ASSERT(priorityNum == execfileNum);
     }
 }
 
@@ -91,63 +106,70 @@ ForkExecute(Thread *t)
 void
 UserProgKernel::Run()
 {
-
-	cout << "Total threads number is " << execfileNum << endl;
+	cout << "Total user threads number is " << execfileNum << endl;
 	for (int n=1;n<=execfileNum;n++)
-		{
+	{
 		t[n] = new Thread(execfile[n]);
 		t[n]->space = new AddrSpace();
+        if (priorityNum)
+            t[n]->setPriority(atoi(priority[n]));
+        else
+            t[n]->setPriority(1);
 		t[n]->Fork((VoidFunctionPtr) &ForkExecute, (void *)t[n]);
 		cout << "Thread " << execfile[n] << " is executing." << endl;
-		}
-//	Thread *t1 = new Thread(execfile[1]);
-//	Thread *t1 = new Thread("../test/test1");
-//	Thread *t2 = new Thread("../test/test2");
+	}
 
-//    AddrSpace *halt = new AddrSpace();
-//	t1->space = new AddrSpace();
-//	t2->space = new AddrSpace();
-
-//    halt->Execute("../test/halt");
-//	t1->Fork((VoidFunctionPtr) &ForkExecute, (void *)t1);
-//	t2->Fork((VoidFunctionPtr) &ForkExecute, (void *)t2);
     ThreadedKernel::Run();
-//	cout << "after ThreadedKernel:Run();" << endl;	// unreachable
 }
 
 //----------------------------------------------------------------------
 // UserProgKernel::SelfTest
 //      Test whether this module is working.
 //----------------------------------------------------------------------
+#define numTestThread 5
+
+void
+SimpleSimulateBurst(int burstTime)
+{
+    Thread *thread = kernel->currentThread;
+    kernel->alarm->WaitUntil(thread->getArrivalTime());
+    int oldTime;
+    while((oldTime = thread->getBurstTime()) > 0)
+    {
+        if (kernel->interrupt->getStatus() == SystemMode)
+            thread->setBurstTime(oldTime - SystemTick);
+        else
+            thread->setBurstTime(oldTime - UserTick);
+        
+        cout << endl << kernel->stats->totalTicks << ": " << thread->getName() << " remain: " << thread->getBurstTime() << endl;
+        kernel->scheduler->Print(); 
+        kernel->interrupt->OneTick();
+    }
+    cout << thread->getName() << " done!" << endl;
+}
 
 void
 UserProgKernel::SelfTest() {
-/*    char ch;
+    // ThreadedKernel::SelfTest();
+    
+    if (testingScheduling)
+    {
+        Thread *t[numTestThread];
+        char *name[] = {"t1", "t2", "t3", "t4", "t5"};
+        int arrivalTime[] = {1, 1, 2, 3, 4};
+        int burstTime[]   = {1, 2, 3, 2, 1};
+        int priority[]    = {2, 2, 3, 4, 1};
 
-    ThreadedKernel::SelfTest();
+        cout << "SelfTest Start" << endl;
 
-    // test out the console device
-
-    cout << "Testing the console device.\n" 
-	<< "Typed characters will be echoed, until q is typed.\n"
-    	<< "Note newlines are needed to flush input through UNIX.\n";
-    cout.flush();
-
-    SynchConsoleInput *input = new SynchConsoleInput(NULL);
-    SynchConsoleOutput *output = new SynchConsoleOutput(NULL);
-
-    do {
-    	ch = input->GetChar();
-    	output->PutChar(ch);   // echo it!
-    } while (ch != 'q');
-
-    cout << "\n";
-
-    // self test for running user programs is to run the halt program above
-*/
-
-
-
-
-//	cout << "This is self test message from UserProgKernel\n" ;
+        for (int i = 0; i < numTestThread; ++i)
+        {
+            t[i] = new Thread(name[i]);
+            t[i]->space = new AddrSpace();
+            t[i]->setArrivalTime((arrivalTime[i] + 10) * TimerTicks);
+            t[i]->setBurstTime(burstTime[i] * TimerTicks);
+            t[i]->setPriority(priority[i]);
+            t[i]->Fork((VoidFunctionPtr) &SimpleSimulateBurst, (void *)burstTime[i]);
+        }
+    }
 }

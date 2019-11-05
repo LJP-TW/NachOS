@@ -31,3 +31,11 @@ print:
 	/bin/csh -c "$(LPR) machine/*.h machine/*.cc
 	/bin/csh -c "$(LPR) bin/noff.h bin/coff.h bin/coff2noff.c"
 	/bin/csh -c "$(LPR) test/*.h test/*.c test/*.s"
+
+testscheduling:
+	./userprog/nachos -T -RR >log/RR 2>&1
+	./userprog/nachos -T -FCFS >log/FCFS 2>&1
+	./userprog/nachos -T -SJF >log/SJF 2>&1
+	./userprog/nachos -T -SRTF >log/SRTF 2>&1
+	./userprog/nachos -T -NPP >log/NPP 2>&1
+	./userprog/nachos -T -PP >log/PP 2>&1

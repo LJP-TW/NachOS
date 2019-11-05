@@ -24,10 +24,12 @@ struct blockedThread {
 // thread is running, and which threads are ready but not running.
 
 enum SchedulerType {
-        RR,     // Round Robin
-        SJF,
-        Priority,
-	FIFO
+    RR,     // Round Robin
+    FIFO,
+    SJF,
+    SRTF,
+    NPP,    // Non-Preemtive Priority
+    PP      // Preemtive Priority
 };
 
 class Scheduler {
@@ -38,6 +40,9 @@ class Scheduler {
 
 	void ReadyToRun(Thread* thread);	
     					// Thread can be dispatched.
+    void ForceEnterReady(Thread* thread); // Make a thread enter ready list, it's for special scheduling e.g. SJF, SRTF
+    void ForceLeaveReady(Thread* thread); // Make a thread leave ready list, it's for special thread e.g. IdleThread
+
     bool Wakeup(); // Wakeup blockedList
 
     void Sleep(Thread *thread, int fromNow);
